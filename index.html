@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SoundStore 🎵</title>
+  <meta name="description" content="Бесплатный магазин звуков — скачивай и делись!" />
+  <meta name="theme-color" content="#7c3aed" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --bg: #0f0f1a; --bg2: #16162a; --bg3: #1e1e35; --border: #2e2e50;
+      --accent: #7c3aed; --accent2: #a855f7; --accent3: #06b6d4;
+      --text: #e2e8f0; --text2: #94a3b8; --danger: #ef4444; --success: #22c55e;
+      --radius: 14px; --shadow: 0 8px 32px rgba(124,58,237,0.18);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    header {
+      background: linear-gradient(135deg, #12122a 0%, #1a1040 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 0 20px; position: sticky; top: 0; z-index: 100; backdrop-filter: blur(12px);
+    }
+    .header-inner {
+      max-width: 1200px; margin: 0 auto; display: flex; align-items: center;
+      justify-content: space-between; height: 64px; gap: 12px;
+    }
+    .logo {
+      display: flex; align-items: center; gap: 10px; font-size: 1.3rem; font-weight: 800;
+      background: linear-gradient(90deg, var(--accent2), var(--accent3));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; white-space: nowrap;
+    }
+    .logo span { font-size: 1.5rem; }
+    .header-actions { display: flex; gap: 10px; align-items: center; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 7px; padding: 9px 18px;
+      border-radius: 10px; border: none; cursor: pointer; font-size: 0.9rem; font-weight: 600; transition: all 0.2s;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff; box-shadow: 0 4px 15px rgba(124,58,237,0.4);
+    }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(124,58,237,0.5); }
+    .btn-ghost { background: transparent; color: var(--text2); border: 1px solid var(--border); }
+    .btn-ghost:hover { background: var(--bg3); color: var(--text); }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-sm { padding: 6px 12px; font-size: 0.8rem; }
+
+    .hero {
+      text-align: center; padding: 60px 20px 40px;
+      background: radial-gradient(ellipse at 50% 0%, rgba(124,58,237,0.15) 0%, transparent 70%);
+    }
+    .hero h1 {
+      font-size: clamp(1.8rem, 5vw, 3rem); font-weight: 900;
+      background: linear-gradient(135deg, #fff 0%, var(--accent2) 50%, var(--accent3) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 14px;
+    }
+    .hero p { color: var(--text2); font-size: 1.05rem; max-width: 500px; margin: 0 auto 28px; }
+    .hero-stats { display: flex; justify-content: center; gap: 32px; flex-wrap: wrap; }
+    .stat { text-align: center; }
+    .stat-num { font-size: 1.6rem; font-weight: 800; color: var(--accent2); }
+    .stat-label { font-size: 0.75rem; color: var(--text2); text-transform: uppercase; letter-spacing: 1px; }
+
+    .controls {
+      max-width: 1200px; margin: 0 auto 28px; padding: 0 20px;
+      display: flex; gap: 12px; flex-wrap: wrap; align-items: center;
+    }
+    .search-wrap { flex: 1; min-width: 200px; position: relative; }
+    .search-wrap input {
+      width: 100%; padding: 12px 16px 12px 44px; background: var(--bg2);
+      border: 1px solid var(--border); border-radius: 10px; color: var(--text);
+      font-size: 0.95rem; outline: none; transition: border-color 0.2s;
+    }
+    .search-wrap input:focus { border-color: var(--accent); }
+    .search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text2); }
+    .filter-select {
+      padding: 12px 16px; background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 10px; color: var(--text); font-size: 0.9rem; outline: none; cursor: pointer;
+    }
+    .filter-select:focus { border-color: var(--accent); }
+
+    .sounds-grid {
+      max-width: 1200px; margin: 0 auto; padding: 0 20px 60px;
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px;
+    }
+
+    .sound-card {
+      background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 20px; transition: all 0.25s; position: relative; overflow: hidden;
+    }
+    .sound-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      background: linear-gradient(90deg, var(--accent), var(--accent3)); opacity: 0; transition: opacity 0.25s;
+    }
+    .sound-card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: var(--shadow); }
+    .sound-card:hover::before { opacity: 1; }
+    .card-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 12px; gap: 10px; }
+    .card-icon {
+      width: 48px; height: 48px; background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 12px; display: flex; align-items: center; justify-content: center;
+      font-size: 1.4rem; flex-shrink: 0;
+    }
+    .card-meta { flex: 1; min-width: 0; }
+    .card-title { font-weight: 700; font-size: 1rem; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .card-desc { font-size: 0.8rem; color: var(--text2); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    .card-category {
+      display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 0.72rem; font-weight: 600;
+      background: rgba(124,58,237,0.2); color: var(--accent2); text-transform: uppercase; letter-spacing: 0.5px;
+    }
+
+    .player-wrap { margin: 14px 0; }
+    .waveform-bar { display: flex; align-items: center; gap: 3px; height: 36px; margin-bottom: 8px; }
+    .waveform-bar .bar { flex: 1; background: var(--border); border-radius: 2px; transition: background 0.3s; }
+    .waveform-bar.playing .bar { background: var(--accent2); }
+    .audio-controls { display: flex; align-items: center; gap: 10px; }
+    .play-btn {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;
+      color: #fff; font-size: 0.9rem; transition: all 0.2s; flex-shrink: 0;
+    }
+    .play-btn:hover { transform: scale(1.1); }
+    .progress-wrap { flex: 1; height: 4px; background: var(--border); border-radius: 2px; cursor: pointer; position: relative; }
+    .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent3)); border-radius: 2px; width: 0%; transition: width 0.1s; }
+    .time-label { font-size: 0.75rem; color: var(--text2); white-space: nowrap; }
+
+    .card-footer {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); gap: 8px;
+    }
+    .card-info { font-size: 0.75rem; color: var(--text2); }
+    .card-actions { display: flex; gap: 6px; }
+    .download-btn {
+      display: inline-flex; align-items: center; gap: 5px; padding: 7px 14px; border-radius: 8px;
+      background: linear-gradient(135deg, var(--accent3), #0891b2); color: #fff;
+      font-size: 0.82rem; font-weight: 600; border: none; cursor: pointer; transition: all 0.2s;
+    }
+    .download-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(6,182,212,0.4); }
+    .delete-btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 32px; height: 32px; border-radius: 8px; background: rgba(239,68,68,0.1);
+      color: var(--danger); border: 1px solid rgba(239,68,68,0.3); cursor: pointer; font-size: 0.9rem; transition: all 0.2s;
+    }
+    .delete-btn:hover { background: var(--danger); color: #fff; }
+
+    .overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(6px);
+      z-index: 200; display: flex; align-items: center; justify-content: center; padding: 20px;
+      opacity: 0; pointer-events: none; transition: opacity 0.2s;
+    }
+    .overlay.open { opacity: 1; pointer-events: all; }
+    .modal {
+      background: var(--bg2); border: 1px solid var(--border); border-radius: 20px; padding: 32px;
+      width: 100%; max-width: 480px; transform: translateY(20px); transition: transform 0.25s;
+    }
+    .overlay.open .modal { transform: translateY(0); }
+    .modal h2 { font-size: 1.3rem; font-weight: 800; margin-bottom: 24px; }
+    .form-group { margin-bottom: 18px; }
+    .form-group label { display: block; font-size: 0.85rem; font-weight: 600; color: var(--text2); margin-bottom: 7px; }
+    .form-group input, .form-group textarea, .form-group select {
+      width: 100%; padding: 11px 14px; background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 10px; color: var(--text); font-size: 0.92rem; outline: none; transition: border-color 0.2s; font-family: inherit;
+    }
+    .form-group input:focus, .form-group textarea:focus, .form-group select:focus { border-color: var(--accent); }
+    .form-group textarea { resize: vertical; min-height: 70px; }
+
+    .file-drop {
+      border: 2px dashed var(--border); border-radius: 12px; padding: 30px; text-align: center;
+      cursor: pointer; transition: all 0.2s; position: relative;
+    }
+    .file-drop:hover, .file-drop.dragover { border-color: var(--accent); background: rgba(124,58,237,0.05); }
+    .file-drop input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; padding: 0; }
+    .file-drop-icon { font-size: 2rem; margin-bottom: 8px; }
+    .file-drop p { color: var(--text2); font-size: 0.88rem; }
+    .file-drop .file-name { color: var(--accent2); font-weight: 600; margin-top: 6px; }
+
+    .upload-progress { display: none; margin-top: 12px; }
+    .upload-progress.show { display: block; }
+    .upload-progress-bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-top: 6px; }
+    .upload-progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent3)); border-radius: 3px; width: 0%; transition: width 0.3s; }
+    .upload-status { font-size: 0.82rem; color: var(--text2); }
+
+    .admin-badge {
+      display: inline-block; padding: 3px 10px; background: rgba(239,68,68,0.15);
+      color: var(--danger); border-radius: 6px; font-size: 0.75rem; font-weight: 700; margin-left: 8px;
+    }
+    .toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
+      background: var(--bg3); border: 1px solid var(--border); border-radius: 10px;
+      padding: 12px 20px; font-size: 0.9rem; z-index: 999; opacity: 0;
+      transition: all 0.3s; pointer-events: none; white-space: nowrap;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .toast.success { border-color: var(--success); color: var(--success); }
+    .toast.error { border-color: var(--danger); color: var(--danger); }
+
+    .empty-state { text-align: center; padding: 80px 20px; color: var(--text2); grid-column: 1 / -1; }
+    .empty-state .empty-icon { font-size: 4rem; margin-bottom: 16px; }
+    .empty-state h3 { font-size: 1.2rem; color: var(--text); margin-bottom: 8px; }
+
+    .loader { grid-column: 1 / -1; text-align: center; padding: 60px; color: var(--text2); }
+    .spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 12px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .install-banner {
+      position: fixed; bottom: 20px; right: 20px; background: var(--bg2); border: 1px solid var(--accent);
+      border-radius: 14px; padding: 16px 20px; max-width: 300px; z-index: 150; box-shadow: var(--shadow); display: none;
+    }
+    .install-banner.show { display: block; }
+    .install-banner h4 { font-size: 0.95rem; margin-bottom: 6px; }
+    .install-banner p { font-size: 0.8rem; color: var(--text2); margin-bottom: 12px; }
+    .install-banner-actions { display: flex; gap: 8px; }
+    .install-close { position: absolute; top: 10px; right: 12px; background: none; border: none; color: var(--text2); cursor: pointer; font-size: 1rem; }
+
+    @media (max-width: 600px) {
+      .hero { padding: 40px 16px 28px; }
+      .hero-stats { gap: 20px; }
+      .sounds-grid { grid-template-columns: 1fr; padding: 0 12px 40px; }
+      .controls { padding: 0 12px; }
+      .modal { padding: 24px 18px; }
+      .header-inner { height: 56px; }
+      .logo-text { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="logo"><span>🎵</span><span class="logo-text">SoundStore</span></div>
+    <div class="header-actions">
+      <button class="btn btn-ghost btn-sm" id="adminBtn">🔐 Админ</button>
+      <button class="btn btn-primary" id="uploadBtn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Загрузить
+      </button>
+    </div>
+  </div>
+</header>
+
+<div class="hero">
+  <h1>🎵 Магазин Звуков</h1>
+  <p>Бесплатные звуки для всех — слушай, скачивай и делись!</p>
+  <div class="hero-stats">
+    <div class="stat"><div class="stat-num" id="totalSounds">0</div><div class="stat-label">Звуков</div></div>
+    <div class="stat"><div class="stat-num" id="totalDownloads">0</div><div class="stat-label">Скачиваний</div></div>
+    <div class="stat"><div class="stat-num">∞</div><div class="stat-label">Бесплатно</div></div>
+  </div>
+</div>
+
+<div class="controls">
+  <div class="search-wrap">
+    <span class="search-icon">🔍</span>
+    <input type="text" id="searchInput" placeholder="Поиск звуков..." />
+  </div>
+  <select class="filter-select" id="categoryFilter">
+    <option value="">Все категории</option>
+    <option value="nature">🌿 Природа</option>
+    <option value="music">🎶 Музыка</option>
+    <option value="effects">⚡ Эффекты</option>
+    <option value="ambient">🌙 Амбиент</option>
+    <option value="voice">🎤 Голос</option>
+    <option value="general">📦 Общее</option>
+  </select>
+</div>
+
+<div class="sounds-grid" id="soundsGrid">
+  <div class="loader"><div class="spinner"></div><p>Загрузка звуков...</p></div>
+</div>
+
+<!-- UPLOAD MODAL -->
+<div class="overlay" id="uploadOverlay">
+  <div class="modal">
+    <h2>🎵 Загрузить звук</h2>
+    <div class="form-group"><label>Название *</label><input type="text" id="soundName" placeholder="Например: Дождь в лесу" maxlength="80" /></div>
+    <div class="form-group"><label>Описание</label><textarea id="soundDesc" placeholder="Коротко о звуке..."></textarea></div>
+    <div class="form-group">
+      <label>Категория</label>
+      <select id="soundCategory">
+        <option value="general">📦 Общее</option>
+        <option value="nature">🌿 Природа</option>
+        <option value="music">🎶 Музыка</option>
+        <option value="effects">⚡ Эффекты</option>
+        <option value="ambient">🌙 Амбиент</option>
+        <option value="voice">🎤 Голос</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Файл * (MP3, WAV, OGG, FLAC — до 50MB)</label>
+      <div class="file-drop" id="fileDrop">
+        <input type="file" id="fileInput" accept="audio/*" />
+        <div class="file-drop-icon">🎧</div>
+        <p>Перетащи файл сюда или нажми для выбора</p>
+        <div class="file-name" id="fileName"></div>
+      </div>
+    </div>
+    <div class="upload-progress" id="uploadProgress">
+      <div class="upload-status" id="uploadStatus">Загрузка...</div>
+      <div class="upload-progress-bar"><div class="upload-progress-fill" id="uploadFill"></div></div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:8px;">
+      <button class="btn btn-ghost" style="flex:1" id="cancelUpload">Отмена</button>
+      <button class="btn btn-primary" style="flex:2" id="submitUpload">⬆ Загрузить</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADMIN MODAL -->
+<div class="overlay" id="adminOverlay">
+  <div class="modal">
+    <h2>🔐 Вход для администратора</h2>
+    <div class="form-group"><label>Пароль</label><input type="password" id="adminPassword" placeholder="Введите пароль..." /></div>
+    <div style="display:flex;gap:10px;">
+      <button class="btn btn-ghost" style="flex:1" id="cancelAdmin">Отмена</button>
+      <button class="btn btn-primary" style="flex:2" id="submitAdmin">Войти</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="install-banner" id="installBanner">
+  <button class="install-close" id="installClose">✕</button>
+  <h4>📲 Установить приложение</h4>
+  <p>Добавь SoundStore на главный экран!</p>
+  <div class="install-banner-actions">
+    <button class="btn btn-ghost btn-sm" id="installDismiss">Не сейчас</button>
+    <button class="btn btn-primary btn-sm" id="installAccept">Установить</button>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://xlrostgawsxcqwdhrser.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhscm9zdGdhd3N4Y3F3ZGhyc2VyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyMjYxOTUsImV4cCI6MjA5NTgwMjE5NX0.PZh5LWCsQ-7lDJUu1GL2vqqR3YCMt5B_nfFZrmEbxXs';
+const ADMIN_PASSWORD = '6347bg27!?';
+const BUCKET = 'sounds';
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let sounds = [], isAdmin = false, currentAudio = null, currentCard = null, deferredInstall = null;
+let searchQuery = '', categoryFilter = '', selectedFile = null;
+
+document.addEventListener('DOMContentLoaded', () => { loadSounds(); setupEvents(); setupPWA(); });
+
+async function loadSounds() {
+  try {
+    const { data, error } = await supabase.from('sounds').select('*').order('created_at', { ascending: false });
+    if (error) throw error;
+    sounds = data || [];
+    renderSounds(); updateStats();
+  } catch(e) {
+    showGrid(`<div class="empty-state"><div class="empty-icon">⚠️</div><h3>Ошибка загрузки</h3><p>${e.message}</p></div>`);
+  }
+}
+
+function updateStats() {
+  document.getElementById('totalSounds').textContent = sounds.length;
+  const total = sounds.reduce((a,s) => a + (s.downloads||0), 0);
+  document.getElementById('totalDownloads').textContent = total > 999 ? (total/1000).toFixed(1)+'k' : total;
+}
+
+const catEmoji = { nature:'🌿', music:'🎶', effects:'⚡', ambient:'🌙', voice:'🎤', general:'📦' };
+const catLabel = { nature:'Природа', music:'Музыка', effects:'Эффекты', ambient:'Амбиент', voice:'Голос', general:'Общее' };
+
+function renderSounds() {
+  const filtered = sounds.filter(s => {
+    const q = searchQuery.toLowerCase();
+    return (!q || s.name.toLowerCase().includes(q) || (s.description||'').toLowerCase().includes(q))
+      && (!categoryFilter || s.category === categoryFilter);
+  });
+  if (!filtered.length) {
+    showGrid(`<div class="empty-state"><div class="empty-icon">🔇</div><h3>${sounds.length?'Ничего не найдено':'Звуков пока нет'}</h3><p>${sounds.length?'Попробуй другой запрос':'Будь первым — загрузи звук!'}</p></div>`);
+    return;
+  }
+  document.getElementById('soundsGrid').innerHTML = filtered.map(s => cardHTML(s)).join('');
+  attachCardEvents();
+}
+
+function showGrid(html) { document.getElementById('soundsGrid').innerHTML = html; }
+
+function cardHTML(s) {
+  const cat = s.category || 'general';
+  const size = s.file_size ? formatBytes(s.file_size) : '';
+  const date = new Date(s.created_at).toLocaleDateString('ru-RU');
+  const seed = s.id ? s.id.char
